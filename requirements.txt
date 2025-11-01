@@ -19,6 +19,23 @@ pydantic==2.5.0
 # Environment and utilities
 python-dotenv==1.0.1
 
-# Optional: For enterprise features (uncomment if needed)
-# redis==5.0.1
-# pyjwt==2.8.0 
+# Security and authentication
+pyjwt==2.8.0
+cryptography==41.0.7
+
+# Database and persistence
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Rate limiting and caching (Redis - optional, has in-memory fallback)
+# redis==5.0.1  # Uncomment if using Redis for rate limiting and caching
+
+# Monitoring and observability (optional)
+# prometheus-client>=0.19.0  # Uncomment for Prometheus metrics
+# sentry-sdk>=1.38.0  # Uncomment for Sentry error tracking
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0  # For FastAPI test client 

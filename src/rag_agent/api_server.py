@@ -1,7 +1,7 @@
 import os
 import asyncio
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -20,6 +20,33 @@ import json
 from datetime import datetime
 import time
 
+# Import security utilities
+from .security import (
+    validate_query as validate_query_input,
+    validate_document_text,
+    get_optional_user,
+    check_rate_limit,
+    get_client_ip,
+    rate_limit_middleware
+)
+
+# Import database utilities
+from .database import get_database, init_database, DatabaseManager
+
+# Import monitoring utilities
+from .monitoring import (
+    init_monitoring,
+    track_request,
+    track_rag_query,
+    track_agent_query,
+    track_db_query,
+    update_documents_count,
+    update_vector_index_size,
+    structured_log,
+    performance_monitor,
+    get_metrics
+)
+
 # Load environment variables
 load_dotenv()
 
@@ -32,10 +59,18 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Add CORS middleware
+# Add CORS middleware - Configure for production
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+if cors_origins == ["*"]:
+    # Development mode - allow all origins
+    allow_origins = ["*"]
+else:
+    # Production mode - specific origins
+    allow_origins = [origin.strip() for origin in cors_origins]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,6 +83,7 @@ index = None
 documents = []
 agent = None
 agent_memory = None
+db: DatabaseManager = None
 
 # Pydantic models for request/response
 class QueryRequest(BaseModel):
@@ -293,13 +329,52 @@ def create_index_from_documents(docs: List[Document]):
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the application on startup"""
+    """Initialize database, LlamaIndex, Agent, and monitoring on startup"""
+    global db
     try:
+        # Initialize monitoring first
+        sentry_dsn = os.getenv("SENTRY_DSN")
+        environment = os.getenv("ENVIRONMENT", "production")
+        init_monitoring(sentry_dsn=sentry_dsn, environment=environment)
+        
+        # Initialize database first
+        db = init_database()
+        structured_log("INFO", "Database initialized successfully")
+        print("✅ Database initialized successfully")
+        
+        # Initialize LlamaIndex
         setup_llamaindex()
+        
+        # Create agent
         create_agent()
+        structured_log("INFO", "LlamaIndex and Agent initialized successfully")
         print("✅ LlamaIndex and Agent initialized successfully")
+        
+        # Load existing documents from database
+        if db:
+            try:
+                from llama_index import Document
+                db_docs = db.get_all_documents(limit=1000)
+                if db_docs:
+                    documents.clear()
+                    for db_doc in db_docs:
+                        if db_doc.indexed:
+                            doc = Document(text=db_doc.text, metadata=db_doc.doc_metadata)
+                            documents.append(doc)
+                    
+                    if documents:
+                        create_index_from_documents(documents)
+                        update_documents_count(len(documents))
+                        structured_log("INFO", f"Loaded {len(documents)} documents from database", document_count=len(documents))
+                        print(f"✅ Loaded {len(documents)} documents from database")
+            except Exception as e:
+                error_msg = str(e)
+                structured_log("WARNING", "Failed to load documents from database", error=error_msg)
+                print(f"⚠️  Warning: Failed to load documents from database: {error_msg}")
     except Exception as e:
-        print(f"❌ Error during startup: {str(e)}")
+        error_msg = str(e)
+        structured_log("ERROR", "Error during startup", error=error_msg, traceback=str(e.__class__.__name__))
+        print(f"❌ Error during startup: {error_msg}")
 
 # Health check endpoint
 @app.get("/health", response_model=HealthResponse)
@@ -308,8 +383,20 @@ async def health_check():
     openai_configured = bool(os.getenv("OPENAI_API_KEY"))
     index_ready = index is not None
     agent_ready = agent is not None
+    db_ready = db is not None
     
-    status = "healthy" if all([openai_configured, index_ready, agent_ready]) else "degraded"
+    # Check database connectivity
+    db_healthy = False
+    if db:
+        try:
+            # Try to query database
+            db.get_all_documents(limit=1)
+            db_healthy = True
+        except Exception:
+            db_healthy = False
+    
+    all_ready = all([openai_configured, index_ready, agent_ready, db_healthy])
+    status = "healthy" if all_ready else "degraded"
     message = "API is ready" if status == "healthy" else "Some components are not ready"
     
     return HealthResponse(
@@ -319,6 +406,67 @@ async def health_check():
         agent_ready=agent_ready,
         message=message
     )
+
+# Detailed health check endpoint
+@app.get("/health/detailed")
+async def detailed_health_check():
+    """Comprehensive health check with all dependencies"""
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "2.0.0",
+        "checks": {
+            "openai": {
+                "configured": bool(os.getenv("OPENAI_API_KEY")),
+                "status": "ok" if os.getenv("OPENAI_API_KEY") else "missing"
+            },
+            "database": {
+                "configured": db is not None,
+                "connected": False,
+                "status": "unknown"
+            },
+            "vector_index": {
+                "exists": index is not None,
+                "document_count": len(documents) if documents else 0,
+                "status": "ok" if index is not None else "not_initialized"
+            },
+            "agent": {
+                "initialized": agent is not None,
+                "status": "ok" if agent is not None else "not_initialized"
+            }
+        },
+        "performance": performance_monitor.get_stats()
+    }
+    
+    # Check database connectivity
+    if db:
+        try:
+            db.get_all_documents(limit=1)
+            health_status["checks"]["database"]["connected"] = True
+            health_status["checks"]["database"]["status"] = "ok"
+        except Exception as e:
+            health_status["checks"]["database"]["connected"] = False
+            health_status["checks"]["database"]["status"] = "error"
+            health_status["checks"]["database"]["error"] = str(e)
+            health_status["status"] = "degraded"
+    
+    # Determine overall status
+    if not all([
+        health_status["checks"]["openai"]["configured"],
+        health_status["checks"]["database"]["connected"],
+        health_status["checks"]["vector_index"]["exists"]
+    ]):
+        health_status["status"] = "degraded"
+    
+    return health_status
+
+# Metrics endpoint for Prometheus
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    from fastapi.responses import Response
+    metrics_data = get_metrics()
+    return Response(content=metrics_data, media_type="text/plain")
 
 # Get index status
 @app.get("/status", response_model=IndexStatus)
@@ -350,18 +498,35 @@ async def get_index_status():
 
 # Traditional RAG query endpoint
 @app.post("/query", response_model=QueryResponse)
-async def query_index(request: QueryRequest):
+async def query_index(request: QueryRequest, req: Request = None):
     """Query the vector index with a question"""
-    if index is None:
-        raise HTTPException(status_code=400, detail="No documents indexed yet. Please add documents first.")
-    
     start_time = time.time()
+    success = False
     
     try:
+        # Rate limiting
+        if req:
+            client_id = get_client_ip(req) or "anonymous"
+            check_rate_limit(client_id, "query")
+        
+        # Input validation
+        query = validate_query_input(request.query)
+        
+        if index is None:
+            raise HTTPException(status_code=400, detail="No documents indexed yet. Please add documents first.")
+        
         query_engine = index.as_query_engine()
-        response = query_engine.query(request.query)
+        response = query_engine.query(query)
         
         processing_time = time.time() - start_time
+        success = True
+        
+        # Track metrics
+        track_rag_query(status="success", duration=processing_time)
+        performance_monitor.record_request(processing_time, success=True)
+        
+        if req:
+            track_request(method=req.method, endpoint=req.url.path, status=200, duration=processing_time)
         
         # Extract sources if requested
         sources = []
@@ -373,14 +538,48 @@ async def query_index(request: QueryRequest):
                     "metadata": node.metadata
                 })
         
+        # Save query history to database
+        if db:
+            try:
+                db_operation_start = time.time()
+                db.add_query_history(
+                    query=query,
+                    response=str(response)[:500],  # Truncate for storage
+                    processing_time=int(processing_time * 1000),  # Convert to milliseconds
+                    sources_count=len(sources)
+                )
+                db_duration = time.time() - db_operation_start
+                track_db_query("add_query_history", "success", db_duration)
+            except Exception as e:
+                db_duration = time.time() - db_operation_start if 'db_operation_start' in locals() else 0
+                track_db_query("add_query_history", "error", db_duration)
+                structured_log("WARNING", "Failed to save query history", error=str(e))
+        
+        structured_log("INFO", "RAG query processed", query_length=len(query), processing_time=processing_time, sources_count=len(sources))
+        
         return QueryResponse(
             answer=str(response),
             sources=sources,
-            query=request.query,
+            query=query,  # Use validated query
             processing_time=processing_time
         )
+    except HTTPException as e:
+        processing_time = time.time() - start_time
+        track_rag_query(status="error", duration=processing_time)
+        performance_monitor.record_request(processing_time, success=False)
+        if req:
+            track_request(method=req.method, endpoint=req.url.path, status=e.status_code, duration=processing_time)
+        structured_log("WARNING", "RAG query failed", status_code=e.status_code, detail=e.detail)
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error querying index: {str(e)}")
+        processing_time = time.time() - start_time
+        track_rag_query(status="error", duration=processing_time)
+        performance_monitor.record_request(processing_time, success=False)
+        if req:
+            track_request(method=req.method, endpoint=req.url.path, status=500, duration=processing_time)
+        error_msg = str(e)
+        structured_log("ERROR", "Error querying index", error=error_msg, traceback=str(e.__class__.__name__))
+        raise HTTPException(status_code=500, detail=f"Error querying index: {error_msg}")
 
 # NEW: Agent query endpoint
 @app.post("/agent/query", response_model=AgentResponse)
@@ -458,13 +657,30 @@ async def clear_agent_memory():
 
 # Add document endpoint
 @app.post("/documents")
-async def add_document(request: DocumentRequest):
+async def add_document(request: DocumentRequest, req: Request = None):
     """Add a document to the index"""
+    global db
+    # Rate limiting
+    if req:
+        client_id = get_client_ip(req) or "anonymous"
+        check_rate_limit(client_id, "document_upload")
+    
+    # Input validation
     try:
+        validated_text = validate_document_text(request.text)
         doc = Document(
-            text=request.text,
+            text=validated_text,
             metadata=request.metadata or {}
         )
+        
+        # Add to database first
+        doc_id = None
+        if db:
+            doc_id = db.add_document(
+                text=validated_text,
+                metadata=request.metadata or {},
+                source=(request.metadata.get("source", "api") if request.metadata else "api")
+            )
         
         documents.append(doc)
         create_index_from_documents(documents)
@@ -472,8 +688,10 @@ async def add_document(request: DocumentRequest):
         return {
             "message": "Document added successfully",
             "document_count": len(documents),
-            "document_id": len(documents) - 1
+            "document_id": doc_id if doc_id else len(documents) - 1
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error adding document: {str(e)}")
 
