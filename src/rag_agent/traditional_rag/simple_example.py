@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from llama_index.core import VectorStoreIndex, Document, Settings
+from llama_index import VectorStoreIndex, Document, Settings
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 

@@ -1,0 +1,33 @@
+LlamaIndex Framework Guide
+
+LlamaIndex is a powerful data framework for LLM applications that provides tools for connecting custom data sources to large language models. It's designed to make it easy to build RAG applications and other LLM-powered systems.
+
+Core Features:
+1. Data Connectors: Connect to various data sources including documents, databases, APIs, and more
+2. Indexing: Create vector embeddings and indexes for efficient retrieval
+3. Query Engines: Build sophisticated query interfaces for your data
+4. Agents: Create autonomous agents that can reason and act on your data
+5. Observability: Monitor and debug your LLM applications
+
+Key Components:
+- Document Loaders: Extract text from various file formats (PDF, DOCX, TXT, etc.)
+- Text Splitters: Break documents into manageable chunks for processing
+- Embeddings: Convert text into vector representations for similarity search
+- Vector Stores: Store and retrieve document embeddings efficiently
+- Query Engines: Process user queries and generate responses
+
+Advantages of LlamaIndex:
+- Easy integration with popular LLM providers (OpenAI, Anthropic, local models)
+- Built-in support for various vector databases
+- Comprehensive data processing pipeline
+- Active development and community support
+- Production-ready features for scaling applications
+
+Common Use Cases:
+- Document Q&A systems
+- Knowledge base chatbots
+- Research assistants
+- Content analysis tools
+- Data exploration interfaces
+
+LlamaIndex simplifies the development of RAG applications by providing a unified interface for data ingestion, processing, and querying, making it an excellent choice for building intelligent document systems. 

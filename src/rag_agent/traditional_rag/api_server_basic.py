@@ -5,11 +5,11 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-from llama_index.core import VectorStoreIndex, Settings, Document
+from llama_index import VectorStoreIndex, Settings, Document
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.readers.web import BeautifulSoupWebReader
-from llama_index.core.node_parser import SentenceSplitter
+from llama_index.node_parser import SentenceSplitter
 import uvicorn
 
 # Load environment variables
