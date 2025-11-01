@@ -13,8 +13,10 @@ from collections import defaultdict, deque
 import pandas as pd
 
 # Configuration
-API_URL = os.getenv("API_URL", "http://localhost:8000")
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+# Support Streamlit secrets for cloud deployment
+# Will be set after st is imported
+API_URL = None
+DEFAULT_MODEL = None
 
 # Cost per token (OpenAI pricing as of 2024)
 COST_PER_1K_TOKENS = {
@@ -166,6 +168,15 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Set configuration from secrets or environment variables (after st is imported)
+if API_URL is None:
+    try:
+        API_URL = st.secrets.get("API_URL", os.getenv("API_URL", "http://localhost:8000"))
+        DEFAULT_MODEL = st.secrets.get("OPENAI_MODEL", os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"))
+    except:
+        API_URL = os.getenv("API_URL", "http://localhost:8000")
+        DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
 
 # Title
 st.title("💰 1-Click Cost & Latency Dashboard")

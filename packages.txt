@@ -1,0 +1,6 @@
+# System packages for Streamlit Cloud deployment
+# Add any system-level packages needed here
+# Example:
+# git
+# curl
+
