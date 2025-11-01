@@ -9,7 +9,22 @@ Complete API reference for the RAG Agent Platform.
 - **Production**: `https://your-domain.com`
 
 ### Authentication
-Currently, the API does not require authentication. Future versions will include API key authentication.
+**JWT Authentication** infrastructure is available but optional. The API can work without authentication for development.
+
+**Optional JWT Token:**
+```
+Authorization: Bearer <token>
+```
+
+**Rate Limiting** is enabled by default:
+- 100 requests per minute per IP (configurable)
+- Applied to all endpoints
+- Returns `429 Too Many Requests` when exceeded
+
+**Input Validation** is automatically applied:
+- Query length limits (default: 2000 characters)
+- Document size limits (default: 100000 characters)
+- Automatic sanitization of inputs
 
 ## 📚 Endpoints
 
@@ -248,13 +263,38 @@ Get system performance metrics.
 | `API_HOST` | API server host | `0.0.0.0` | No |
 | `API_PORT` | API server port | `8000` | No |
 | `MAX_DOCUMENTS` | Maximum documents to index | `1000` | No |
-| `MAX_QUERY_LENGTH` | Maximum query length | `1000` | No |
+| `MAX_QUERY_LENGTH` | Maximum query length | `2000` | No |
+| `MAX_DOCUMENT_LENGTH` | Maximum document length | `100000` | No |
+| `JWT_SECRET` | Secret for JWT tokens | - | No |
+| `CORS_ORIGINS` | Allowed origins (comma-separated) | `*` | No |
+| `RATE_LIMIT_ENABLED` | Enable rate limiting | `true` | No |
+| `RATE_LIMIT_REQUESTS` | Requests per window | `100` | No |
+| `RATE_LIMIT_WINDOW` | Window in seconds | `60` | No |
+| `DATABASE_URL` | Database connection string | - | No |
+| `DATABASE_PATH` | SQLite database path | `data/rag_platform.db` | No |
 
-### Rate Limiting
+### Rate Limiting ✅
 
-- **Queries**: 100 requests per minute per IP
-- **Document uploads**: 10 requests per minute per IP
-- **Video generation**: 5 requests per hour per IP
+**Implemented and Active:**
+- **Default**: 100 requests per minute per IP (configurable)
+- **Queries**: Applied to `/query` endpoint
+- **Document uploads**: Applied to `/documents` endpoint
+- **All endpoints**: Rate limiting active by default
+- **Redis support**: Optional Redis backend for distributed rate limiting
+- **In-memory fallback**: Works without Redis for single-instance deployments
+
+**Configuration:**
+- `RATE_LIMIT_ENABLED=true` (default)
+- `RATE_LIMIT_REQUESTS=100` (default)
+- `RATE_LIMIT_WINDOW=60` (default, in seconds)
+
+**Error Response:**
+```json
+{
+  "detail": "Rate limit exceeded. Max 100 requests per 60 seconds."
+}
+```
+HTTP Status: `429 Too Many Requests`
 
 ## 📝 Error Handling
 
@@ -285,23 +325,35 @@ Get system performance metrics.
 | `OPENAI_API_ERROR` | 502 | OpenAI API error |
 | `INDEXING_ERROR` | 500 | Document indexing error |
 
-## 🔐 Security
+## 🔐 Security ✅
 
-### Input Validation
-- All inputs are validated and sanitized
-- SQL injection protection
-- XSS protection
-- File upload restrictions
+### ✅ Implemented Security Features
 
-### Rate Limiting
-- IP-based rate limiting
-- User-based rate limiting (future)
-- API key-based rate limiting (future)
+#### Input Validation
+- ✅ **Query validation**: Automatic sanitization and length limits (2000 chars default)
+- ✅ **Document validation**: Size limits (100000 chars default) and content sanitization
+- ✅ **SQL injection protection**: Parameterized queries with SQLAlchemy
+- ✅ **XSS protection**: Input sanitization on all user inputs
+- ✅ **File upload restrictions**: Size and type validation
 
-### CORS
-- Configurable CORS settings
-- Default: Allow all origins (development)
-- Production: Restricted origins
+#### Rate Limiting ✅
+- ✅ **IP-based rate limiting**: 100 requests/minute per IP (configurable)
+- ✅ **Endpoint-specific limits**: Different limits for different operations
+- ✅ **Redis support**: Optional Redis backend for distributed rate limiting
+- ✅ **In-memory fallback**: Works without Redis for single-instance deployments
+- ✅ **Configuration**: Via `RATE_LIMIT_REQUESTS`, `RATE_LIMIT_WINDOW` environment variables
+
+#### CORS ✅
+- ✅ **Configurable CORS**: Set via `CORS_ORIGINS` environment variable
+- ✅ **Development mode**: `*` for all origins (configurable)
+- ✅ **Production mode**: Specific domain restrictions
+- ✅ **Security headers**: Ready for production deployment
+
+#### JWT Authentication ✅
+- ✅ **JWT infrastructure**: Token creation and verification ready
+- ✅ **Optional authentication**: Can be enabled per endpoint
+- ✅ **Production-ready**: Secure token handling with expiration
+- ✅ **Configuration**: Via `JWT_SECRET` environment variable
 
 ## 📊 Monitoring
 

@@ -1,21 +1,19 @@
 """
-Test configuration and fixtures.
+Test configuration and fixtures for RAG Agent Platform.
 """
 
 import pytest
 import tempfile
 import shutil
+import os
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
+from fastapi.testclient import TestClient
 
 import sys
-from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from video_generation.core.config_manager import VideoConfig, ConfigManager
-from video_generation.generators.rag_platform_generator import RAGPlatformVideoGenerator
 
 
 @pytest.fixture
@@ -27,70 +25,91 @@ def temp_dir():
 
 
 @pytest.fixture
-def sample_config(temp_dir):
-    """Create sample video configuration."""
-    return VideoConfig(
-        project_name="Test Project",
-        project_description="Test description",
-        tech_stack=["Python", "Test"],
-        output_dir=str(temp_dir / "output"),
-        temp_dir=str(temp_dir / "temp"),
-        voice_name="en-US-AriaNeural",
-        voice_speed=1.0,
-        video_resolution="1920x1080",
-        video_quality="high",
-        slide_duration=5.0
-    )
+def mock_openai_key(monkeypatch):
+    """Mock OpenAI API key for testing."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-123")
+    yield "test-key-123"
 
 
 @pytest.fixture
-def config_manager(temp_dir):
-    """Create config manager with temporary directory."""
-    config_dir = temp_dir / "config"
-    config_dir.mkdir()
-    return ConfigManager(config_dir)
+def mock_settings():
+    """Mock LlamaIndex Settings."""
+    with patch('src.rag_agent.api_server.Settings') as mock_settings:
+        yield mock_settings
 
 
 @pytest.fixture
-def mock_generator(sample_config):
-    """Create mock video generator."""
-    with patch('src.video_generation.generators.rag_platform_generator.subprocess.run') as mock_subprocess:
-        mock_subprocess.return_value.returncode = 0
-        generator = RAGPlatformVideoGenerator(sample_config)
-        yield generator
-
-
-@pytest.fixture
-def sample_slides():
-    """Sample slide data for testing."""
+def sample_documents():
+    """Sample documents for testing."""
     return [
-        {
-            "title": "Test Slide 1",
-            "subtitle": "Introduction",
-            "content": "This is a test slide",
-            "background": "gradient-blue"
-        },
-        {
-            "title": "Test Slide 2",
-            "subtitle": "Features",
-            "content": "• Feature 1\n• Feature 2",
-            "background": "gradient-purple"
-        }
+        "RAG (Retrieval-Augmented Generation) is a technique that combines retrieval with generation.",
+        "LlamaIndex is a data framework for LLM applications.",
+        "OpenAI provides powerful language models like GPT-3.5 and GPT-4."
     ]
 
 
 @pytest.fixture
-def sample_script():
-    """Sample script for testing."""
-    return """
-    Welcome to the Test Project!
-    
-    This project demonstrates the RAG Agent Platform capabilities.
-    
-    Key features include:
-    • RAG System
-    • Video Generation
-    • Agent Architecture
-    
-    Thank you for watching!
-    """.strip()
+def sample_query():
+    """Sample query for testing."""
+    return "What is RAG?"
+
+
+@pytest.fixture
+def mock_llm():
+    """Mock LLM for testing."""
+    mock = MagicMock()
+    mock.complete.return_value = "Mock response"
+    return mock
+
+
+@pytest.fixture
+def mock_embed_model():
+    """Mock embedding model for testing."""
+    mock = MagicMock()
+    mock.get_query_embedding.return_value = [0.1] * 1536
+    mock.get_text_embeddings.return_value = [[0.1] * 1536]
+    return mock
+
+
+@pytest.fixture
+def mock_vector_index():
+    """Mock vector index for testing."""
+    mock = MagicMock()
+    mock_query_engine = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "Mock answer"
+    mock_response.source_nodes = []
+    mock_query_engine.query.return_value = mock_response
+    mock.as_query_engine.return_value = mock_query_engine
+    return mock
+
+
+@pytest.fixture
+def mock_agent():
+    """Mock agent for testing."""
+    mock = MagicMock()
+    mock_response = MagicMock()
+    mock_response.__str__ = lambda x: "Agent response"
+    mock.chat.return_value = mock_response
+    mock.memory = MagicMock()
+    mock.memory.reset = MagicMock()
+    return mock
+
+
+@pytest.fixture
+def client():
+    """Create test client for FastAPI."""
+    # We'll patch the imports to avoid actual initialization
+    with patch('src.rag_agent.api_server.setup_llamaindex'), \
+         patch('src.rag_agent.api_server.index', None), \
+         patch('src.rag_agent.api_server.agent', None):
+        from src.rag_agent.api_server import app
+        client = TestClient(app)
+        yield client
+
+
+@pytest.fixture(autouse=True)
+def reset_global_state():
+    """Reset global state before each test."""
+    yield
+    # Cleanup if needed
