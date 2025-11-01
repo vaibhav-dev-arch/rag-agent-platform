@@ -502,6 +502,6 @@ python -m src api
 ```
 
 ### Support
-- **GitHub Issues**: [Report bugs](https://github.com/ragagentplatform/rag-agent-platform/issues)
-- **Documentation**: [Full documentation](https://github.com/ragagentplatform/rag-agent-platform/wiki)
-- **Community**: [Discussions](https://github.com/ragagentplatform/rag-agent-platform/discussions)
+- **GitHub Issues**: [Report bugs](https://github.com/vaibhav-dev-arch/rag-agent-platform/issues)
+- **Documentation**: [Full documentation](https://github.com/vaibhav-dev-arch/rag-agent-platform/wiki)
+- **Community**: [Discussions](https://github.com/vaibhav-dev-arch/rag-agent-platform/discussions)

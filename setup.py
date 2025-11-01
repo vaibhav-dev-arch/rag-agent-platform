@@ -24,7 +24,7 @@ setup(
     description="A comprehensive RAG (Retrieval-Augmented Generation) platform with agent architecture and video generation",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ragagentplatform/rag-agent-platform",
+    url="https://github.com/vaibhav-dev-arch/rag-agent-platform",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     classifiers=[

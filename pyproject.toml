@@ -75,11 +75,11 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ragagentplatform/rag-agent-platform"
+Homepage = "https://github.com/vaibhav-dev-arch/rag-agent-platform"
 Documentation = "https://rag-agent-platform.readthedocs.io"
-Repository = "https://github.com/ragagentplatform/rag-agent-platform.git"
-"Bug Tracker" = "https://github.com/ragagentplatform/rag-agent-platform/issues"
-"Source Code" = "https://github.com/ragagentplatform/rag-agent-platform"
+Repository = "https://github.com/vaibhav-dev-arch/rag-agent-platform.git"
+"Bug Tracker" = "https://github.com/vaibhav-dev-arch/rag-agent-platform/issues"
+"Source Code" = "https://github.com/vaibhav-dev-arch/rag-agent-platform"
 
 [project.scripts]
 rag-platform = "src.__main__:main"

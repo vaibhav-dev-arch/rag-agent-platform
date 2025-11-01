@@ -50,7 +50,7 @@ rag-agent-platform/
 ### Setup
 1. Clone the repository:
 ```bash
-git clone https://github.com/ragagentplatform/rag-agent-platform.git
+git clone https://github.com/vaibhav-dev-arch/rag-agent-platform.git
 cd rag-agent-platform
 ```
 
@@ -158,9 +158,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/ragagentplatform/rag-agent-platform/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/ragagentplatform/rag-agent-platform/discussions)
-- **Documentation**: [Project Wiki](https://github.com/ragagentplatform/rag-agent-platform/wiki)
+- **Issues**: [GitHub Issues](https://github.com/vaibhav-dev-arch/rag-agent-platform/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/vaibhav-dev-arch/rag-agent-platform/discussions)
+- **Documentation**: [Project Wiki](https://github.com/vaibhav-dev-arch/rag-agent-platform/wiki)
 
 ## 🎯 Roadmap
 
